@@ -181,3 +181,21 @@ int index_add(Index *index, const char *path)
     // Step 5: save index
     return index_save(index);
 }
+int index_status(const Index *index)
+{
+    printf("Staged changes:\n");
+
+    if (index->count == 0)
+    {
+        printf("  (nothing to show)\n\n");
+        return 0;
+    }
+
+    for (int i = 0; i < index->count; i++)
+    {
+        printf("  staged:     %s\n", index->entries[i].path);
+    }
+
+    printf("\n");
+    return 0;
+}

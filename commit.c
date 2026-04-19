@@ -214,7 +214,11 @@ int head_update(const ObjectID *new_commit)
     fprintf(f, "%s\n", hex);
 
     fflush(f);
+   #ifdef _WIN32
+    fflush(f);
+#else
     fsync(fileno(f));
+#endif
     fclose(f);
 
     return rename(tmp_path, target_path);
