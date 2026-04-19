@@ -69,3 +69,56 @@ int tree_serialize(const Tree *tree, void **data_out, size_t *len_out)
 
     return 0;
 }
+
+int tree_from_index(ObjectID *id_out)
+{
+    // Step 1: load index
+    Index index;
+    if (index_load(&index) != 0)
+        return -1;
+
+    // Step 2: initialize tree
+    Tree tree;
+    memset(&tree, 0, sizeof(Tree));
+
+    // Step 3: convert index entries → tree entries
+    for (int i = 0; i < index.count; i++)
+    {
+        const char *path = index.entries[i].path;
+
+        // skip nested paths for simplicity
+        if (!path || strchr(path, '/'))
+            continue;
+
+        if (tree.count >= MAX_TREE_ENTRIES)
+            return -1;
+
+        TreeEntry *entry = &tree.entries[tree.count];
+
+        entry->mode = index.entries[i].mode;
+
+        strncpy(entry->name, path, sizeof(entry->name) - 1);
+        entry->name[sizeof(entry->name) - 1] = '\0';
+
+        entry->hash = index.entries[i].hash;
+
+        tree.count++;
+    }
+
+    // Step 4: serialize tree
+    void *data = NULL;
+    size_t len = 0;
+
+    if (tree_serialize(&tree, &data, &len) != 0)
+        return -1;
+
+    // Step 5: write object
+    if (object_write(OBJ_TREE, data, len, id_out) != 0)
+    {
+        free(data);
+        return -1;
+    }
+
+    free(data);
+    return 0;
+}
