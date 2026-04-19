@@ -30,3 +30,18 @@ int hex_to_hash(const char *hex, ObjectID *id_out)
 
     return 0;
 }
+
+
+
+void compute_hash(const void *data, size_t len, ObjectID *id_out)
+{
+    const unsigned char *bytes = (const unsigned char *)data;
+
+    for (int i = 0; i < HASH_SIZE; i++)
+        id_out->hash[i] = 0;
+
+    for (size_t i = 0; i < len; i++)
+    {
+        id_out->hash[i % HASH_SIZE] ^= bytes[i];
+    }
+}
