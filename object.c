@@ -134,3 +134,72 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
 
     return 0;
 }
+
+int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_t *len_out)
+{
+    char path[512];
+    object_path(id, path, sizeof(path));
+
+    FILE *fp = fopen(path, "rb");
+    if (!fp) return -1;
+
+    fseek(fp, 0, SEEK_END);
+    long size = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    if (size <= 0)
+    {
+        fclose(fp);
+        return -1;
+    }
+
+    unsigned char *buffer = malloc(size);
+    if (!buffer)
+    {
+        fclose(fp);
+        return -1;
+    }
+
+    fread(buffer, 1, size, fp);
+    fclose(fp);
+
+    unsigned char *null_pos = memchr(buffer, '\0', size);
+    if (!null_pos)
+    {
+        free(buffer);
+        return -1;
+    }
+
+    char type_str[16];
+    size_t data_size;
+
+    sscanf((char *)buffer, "%15s %zu", type_str, &data_size);
+
+    if (strcmp(type_str, "blob") == 0)
+        *type_out = OBJ_BLOB;
+    else if (strcmp(type_str, "tree") == 0)
+        *type_out = OBJ_TREE;
+    else if (strcmp(type_str, "commit") == 0)
+        *type_out = OBJ_COMMIT;
+    else
+    {
+        free(buffer);
+        return -1;
+    }
+
+    size_t header_len = (null_pos - buffer) + 1;
+    size_t actual_data_len = size - header_len;
+
+    *data_out = malloc(actual_data_len);
+    if (!*data_out)
+    {
+        free(buffer);
+        return -1;
+    }
+
+    memcpy(*data_out, buffer + header_len, actual_data_len);
+    *len_out = actual_data_len;
+
+    free(buffer);
+    return 0;
+}
