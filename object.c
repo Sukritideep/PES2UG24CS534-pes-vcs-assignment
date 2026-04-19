@@ -14,6 +14,7 @@ void hash_to_hex(const ObjectID *id, char *hex_out)
     hex_out[HASH_HEX_SIZE] = '\0';
 }
 
+// convert hex to hash
 int hex_to_hash(const char *hex, ObjectID *id_out)
 {
     if (strlen(hex) < HASH_HEX_SIZE)
@@ -32,8 +33,7 @@ int hex_to_hash(const char *hex, ObjectID *id_out)
     return 0;
 }
 
-
-
+// simple hash (no OpenSSL)
 void compute_hash(const void *data, size_t len, ObjectID *id_out)
 {
     const unsigned char *bytes = (const unsigned char *)data;
@@ -47,8 +47,16 @@ void compute_hash(const void *data, size_t len, ObjectID *id_out)
     }
 }
 
+// generate object path
+void object_path(const ObjectID *id, char *path_out, size_t path_size)
+{
+    char hex[HASH_HEX_SIZE + 1];
+    hash_to_hex(id, hex);
 
-// check if object already exists
+    snprintf(path_out, path_size, ".pes/objects/%.2s/%s", hex, hex + 2);
+}
+
+// check if object exists
 int object_exists(const ObjectID *id)
 {
     char path[512];
@@ -57,7 +65,7 @@ int object_exists(const ObjectID *id)
     return access(path, F_OK) == 0;
 }
 
-// start object_write (partial)
+// object write
 int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out)
 {
     const char *type_str;
@@ -88,8 +96,41 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
         return 0;
     }
 
-    // remaining steps in next commit
+    char path[512];
+    object_path(id_out, path, sizeof(path));
+
+    char hex[HASH_HEX_SIZE + 1];
+    hash_to_hex(id_out, hex);
+
+    char shard_dir[512];
+    snprintf(shard_dir, sizeof(shard_dir), ".pes/objects/%.2s", hex);
+
+#ifdef _WIN32
+    mkdir(".pes");
+    mkdir(".pes/objects");
+    mkdir(shard_dir);
+#else
+    mkdir(".pes", 0755);
+    mkdir(".pes/objects", 0755);
+    mkdir(shard_dir, 0755);
+#endif
+
+    char temp_path[520];
+    snprintf(temp_path, sizeof(temp_path), "%s/tmp_%s", shard_dir, hex + 2);
+
+    FILE *fp = fopen(temp_path, "wb");
+    if (!fp)
+    {
+        free(buffer);
+        return -1;
+    }
+
+    fwrite(buffer, 1, total_len, fp);
+    fclose(fp);
 
     free(buffer);
-    return -1;
+
+    rename(temp_path, path);
+
+    return 0;
 }
