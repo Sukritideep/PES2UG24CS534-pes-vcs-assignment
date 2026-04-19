@@ -122,3 +122,32 @@ int tree_from_index(ObjectID *id_out)
     free(data);
     return 0;
 }
+int tree_parse(const void *data, size_t len, Tree *tree_out)
+{
+    const unsigned char *ptr = (const unsigned char *)data;
+    size_t offset = 0;
+
+    tree_out->count = 0;
+
+    while (offset < len)
+    {
+        TreeEntry *entry = &tree_out->entries[tree_out->count];
+
+        // read mode and name
+        sscanf((const char *)(ptr + offset), "%o %255s",
+               &entry->mode, entry->name);
+
+        // move to null terminator
+        while (ptr[offset] != '\0')
+            offset++;
+        offset++; // skip null
+
+        // read hash
+        memcpy(entry->hash.hash, ptr + offset, HASH_SIZE);
+        offset += HASH_SIZE;
+
+        tree_out->count++;
+    }
+
+    return 0;
+}
